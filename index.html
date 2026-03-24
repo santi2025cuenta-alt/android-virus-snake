@@ -21,12 +21,14 @@
         <div class="score-value" id="score">0</div>
     </div>
     <canvas id="gc" width="300" height="300"></canvas>
+    
     <div class="controls">
         <div></div><button class="btn" onclick="setDir('UP')">▲</button><div></div>
         <button class="btn" onclick="setDir('LEFT')">◀</button>
         <button class="btn" onclick="setDir('DOWN')">▼</button>
         <button class="btn" onclick="setDir('RIGHT')">▶</button>
     </div>
+
     <div id="retry-screen">
         <h2 style="color:#dc3545; margin:0;">¡GAME OVER!</h2>
         <p id="status-text"></p>
@@ -42,6 +44,22 @@
         const cvs = document.getElementById("gc"), ctx = cvs.getContext("2d");
         let box = 20, snake, food, d, score, monedas, game;
 
+        // --- CONTROL POR TECLADO (NUEVO) ---
+        document.addEventListener("keydown", function(e) {
+            const key = e.key.toUpperCase();
+            
+            // WASD o Flechas
+            if ((key === "W" || key === "ARROWUP") && d !== "DOWN") d = "UP";
+            if ((key === "S" || key === "ARROWDOWN") && d !== "UP") d = "DOWN";
+            if ((key === "A" || key === "ARROWLEFT") && d !== "RIGHT") d = "LEFT";
+            if ((key === "D" || key === "ARROWRIGHT") && d !== "LEFT") d = "RIGHT";
+
+            // Evitar que las flechas muevan la pantalla del navegador
+            if(["ARROWUP","ARROWDOWN","ARROWLEFT","ARROWRIGHT"].includes(key)) {
+                e.preventDefault();
+            }
+        });
+
         function setDir(n) { 
             if(n=='LEFT'&&d!='RIGHT')d='LEFT'; if(n=='UP'&&d!='DOWN')d='UP';
             if(n=='RIGHT'&&d!='LEFT')d='RIGHT'; if(n=='DOWN'&&d!='UP')d='DOWN';
@@ -50,10 +68,9 @@
         function enviarYReiniciar() {
             if (score > 0) {
                 try {
-                    // Intenta enviar datos (funciona en Privado/Teclado)
                     tg.sendData(JSON.stringify({"puntos": score}));
                 } catch (e) {
-                    alert("En grupos, usa el botón SALIR para guardar.");
+                    console.log("Error al enviar datos");
                 }
             }
             resetGame();
@@ -93,7 +110,6 @@
                 clearInterval(game);
                 document.getElementById("status-text").innerText="Total: "+score+" ADC";
                 document.getElementById("retry-screen").style.display="block";
-                // Auto-envío al morir
                 if(score>0) try { tg.sendData(JSON.stringify({"puntos": score})); } catch(e){}
                 return;
             }
