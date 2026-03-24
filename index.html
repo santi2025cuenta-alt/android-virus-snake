@@ -72,23 +72,20 @@
     <div id="retry-screen">
         <h2 style="color:#dc3545; margin-top:0;">¡GAME OVER!</h2>
         <p id="status-text">Sincronizando puntos...</p>
-        <button class="btn" onclick="resetGame()">REINTENTAR</button>
+        <button class="btn" onclick="enviarYReiniciar()">REINTENTAR</button>
     </div>
 
     <script>
         // --- VERIFICACIÓN DE TELEGRAM ---
         const tg = window.Telegram.WebApp;
-        
-        // Avisamos a Telegram que la App está lista
         tg.ready();
+        tg.expand();
 
-        if (!tg.initDataUnsafe || !tg.initDataUnsafe.user) {
+        // Verificar si estamos realmente en Telegram
+        if (!tg.initDataUnsafe || Object.keys(tg.initDataUnsafe).length === 0) {
             document.getElementById("lock-screen").style.display = "flex";
-            // No bloqueamos el script aquí para permitir pruebas básicas, 
-            // pero el envío de datos fallará fuera de Telegram.
         }
 
-        tg.expand();
         const cvs = document.getElementById("gc"), ctx = cvs.getContext("2d");
         let box = 20, snake, food, d, score, raw, game;
 
@@ -106,6 +103,16 @@
             if (key === "arrowleft" || key === "a") setDir("LEFT");
             if (key === "arrowright" || key === "d") setDir("RIGHT");
         });
+
+        // NUEVA FUNCIÓN: Envía datos y luego reinicia o cierra
+        function enviarYReiniciar() {
+            if (score > 0) {
+                tg.sendData(JSON.stringify({"puntos": score}));
+                // IMPORTANTE: tg.sendData CIERRA la WebApp automáticamente 
+                // si se configuró correctamente en un botón de teclado.
+            }
+            resetGame();
+        }
 
         function resetGame() {
             document.getElementById("retry-screen").style.display = "none";
@@ -143,19 +150,13 @@
                 clearInterval(game);
                 document.getElementById("retry-screen").style.display = "block";
                 
-                // --- CAMBIO CLAVE AQUÍ ---
-                // Enviamos los datos inmediatamente al morir
+                // Intentamos enviar los datos al morir inmediatamente
                 if(score > 0) {
-                    const payload = JSON.stringify({"puntos": score});
-                    tg.sendData(payload);
-                    
-                    // Opcional: Mostramos en pantalla que se envió
-                    document.getElementById("status-text").innerText = "¡Puntos enviados al Bot!";
-                    
-                    // Cerramos la WebApp tras un breve delay para asegurar el envío
-                    setTimeout(() => {
-                        tg.close();
-                    }, 500);
+                    try {
+                        tg.sendData(JSON.stringify({"puntos": score}));
+                    } catch (e) {
+                        console.error("Error al enviar datos:", e);
+                    }
                 }
                 return;
             }
