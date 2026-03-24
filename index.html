@@ -71,7 +71,7 @@
 
     <div id="retry-screen">
         <h2 style="color:#dc3545; margin-top:0;">¡GAME OVER!</h2>
-        <p>Sincronizando puntos...</p>
+        <p id="status-text">Sincronizando puntos...</p>
         <button class="btn" onclick="resetGame()">REINTENTAR</button>
     </div>
 
@@ -79,9 +79,13 @@
         // --- VERIFICACIÓN DE TELEGRAM ---
         const tg = window.Telegram.WebApp;
         
+        // Avisamos a Telegram que la App está lista
+        tg.ready();
+
         if (!tg.initDataUnsafe || !tg.initDataUnsafe.user) {
             document.getElementById("lock-screen").style.display = "flex";
-            throw new Error("Acceso no autorizado.");
+            // No bloqueamos el script aquí para permitir pruebas básicas, 
+            // pero el envío de datos fallará fuera de Telegram.
         }
 
         tg.expand();
@@ -105,6 +109,7 @@
 
         function resetGame() {
             document.getElementById("retry-screen").style.display = "none";
+            document.getElementById("status-text").innerText = "Sincronizando puntos...";
             snake = [{x: 7*box, y: 10*box}, {x: 6*box, y: 10*box}, {x: 5*box, y: 10*box}];
             food = {x: Math.floor(Math.random()*14+1)*box, y: Math.floor(Math.random()*14+1)*box};
             d = "RIGHT"; score = 0; raw = 0;
@@ -116,13 +121,11 @@
         function draw() {
             ctx.fillStyle = "white"; ctx.fillRect(0,0,300,300);
             
-            // Serpiente Verde
             for(let i=0; i<snake.length; i++){
                 ctx.fillStyle = (i==0) ? "#28a745" : "#5cb85c";
                 ctx.fillRect(snake[i].x, snake[i].y, box-1, box-1);
             }
 
-            // Moneda Amarilla
             ctx.fillStyle = "#ffc107";
             ctx.beginPath(); ctx.arc(food.x+10, food.y+10, 8, 0, Math.PI*2); ctx.fill();
 
@@ -140,11 +143,19 @@
                 clearInterval(game);
                 document.getElementById("retry-screen").style.display = "block";
                 
-                // Envía puntos y cierra la WebApp para que el Bot los procese
+                // --- CAMBIO CLAVE AQUÍ ---
+                // Enviamos los datos inmediatamente al morir
                 if(score > 0) {
+                    const payload = JSON.stringify({"puntos": score});
+                    tg.sendData(payload);
+                    
+                    // Opcional: Mostramos en pantalla que se envió
+                    document.getElementById("status-text").innerText = "¡Puntos enviados al Bot!";
+                    
+                    // Cerramos la WebApp tras un breve delay para asegurar el envío
                     setTimeout(() => {
-                        tg.sendData(JSON.stringify({"puntos": score}));
-                    }, 1000); 
+                        tg.close();
+                    }, 500);
                 }
                 return;
             }
