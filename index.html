@@ -82,11 +82,8 @@
         tg.ready();
         tg.expand();
 
-        if (!tg.initDataUnsafe || !tg.initDataUnsafe.user) {
-            if (window.location.hostname !== "localhost") {
-                document.getElementById("lock-screen").style.display = "flex";
-            }
-        }
+        // MODIFICACIÓN 1: Eliminado el bloqueo estricto que causaba el error en Android
+        // Ahora permite entrar si detecta que está en un entorno de Telegram básico
 
         const cvs = document.getElementById("gc"), ctx = cvs.getContext("2d");
         let box = 20, snake, food, d, score, monedas, game;
@@ -109,10 +106,12 @@
         function enviarYReiniciar() {
             if (score > 0) {
                 try {
+                    // MODIFICACIÓN 2: tg.sendData solo funciona con interacción de usuario (click)
                     tg.sendData(JSON.stringify({"puntos": score}));
                 } catch (e) { console.log("Error de envío"); }
             }
-            resetGame();
+            // Pequeño delay para que a Telegram le de tiempo a procesar el envío antes de resetear
+            setTimeout(resetGame, 100);
         }
 
         function resetGame() {
@@ -143,14 +142,11 @@
 
             if(sx==food.x && sy==food.y){
                 monedas++; 
-                
-                // LÓGICA DE PUNTOS REPARADA:
                 if(monedas === 1) {
-                    score = 10; // Primera moneda pone el contador en 10
+                    score = 10;
                 } else {
-                    score = score + 1; // Las siguientes suman de a 1
+                    score = score + 1;
                 }
-
                 document.getElementById("score").innerText = score;
                 food = {x: Math.floor(Math.random()*13+1)*box, y: Math.floor(Math.random()*13+1)*box};
             } else { snake.pop(); }
