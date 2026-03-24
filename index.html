@@ -89,7 +89,7 @@
         }
 
         const cvs = document.getElementById("gc"), ctx = cvs.getContext("2d");
-        let box = 20, snake, food, d, score, raw, game;
+        let box = 20, snake, food, d, score, monedas, game; // 'monedas' cuenta cuántas llevas
 
         function setDir(newDir) {
             if(newDir == "LEFT" && d != "RIGHT") d = "LEFT";
@@ -111,8 +111,6 @@
                 const data = JSON.stringify({"puntos": score});
                 try {
                     tg.sendData(data);
-                    // Si sendData funciona (Privado), la app se cierra sola.
-                    // Si no, reiniciamos el juego tras un delay.
                     setTimeout(resetGame, 500);
                 } catch (e) {
                     resetGame();
@@ -127,7 +125,9 @@
             document.getElementById("status-text").innerText = "Sincronizando puntos...";
             snake = [{x: 7*box, y: 10*box}, {x: 6*box, y: 10*box}, {x: 5*box, y: 10*box}];
             food = {x: Math.floor(Math.random()*14+1)*box, y: Math.floor(Math.random()*14+1)*box};
-            d = "RIGHT"; score = 0; raw = 0;
+            d = "RIGHT"; 
+            score = 0; 
+            monedas = 0; // Reset de contador de monedas
             document.getElementById("score").innerText = "0";
             if(game) clearInterval(game);
             game = setInterval(draw, 140);
@@ -148,7 +148,15 @@
             if(d=="LEFT") sx-=box; if(d=="UP") sy-=box; if(d=="RIGHT") sx+=box; if(d=="DOWN") sy+=box;
 
             if(sx==food.x && sy==food.y){
-                score = score + 10; 
+                monedas++; // Sumamos una moneda recolectada
+                
+                // Lógica corregida:
+                if(monedas === 1) {
+                    score = 10; // La primera vale 10
+                } else {
+                    score = score + 1; // Las demás valen 1
+                }
+
                 document.getElementById("score").innerText = score;
                 food = {x: Math.floor(Math.random()*13+1)*box, y: Math.floor(Math.random()*13+1)*box};
             } else { snake.pop(); }
@@ -160,11 +168,11 @@
                 document.getElementById("retry-screen").style.display = "block";
                 
                 if(score > 0) {
-                    document.getElementById("status-text").innerText = "Acumulado: " + score;
+                    document.getElementById("status-text").innerText = "ADC Extraídas: " + score;
                     try {
                         tg.sendData(JSON.stringify({"puntos": score}));
                     } catch (e) {
-                        console.log("Modo Grupo: Usa el botón 'Salir' para guardar.");
+                        console.log("Modo Grupo habilitado.");
                     }
                 }
                 return;
