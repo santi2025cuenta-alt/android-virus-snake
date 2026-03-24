@@ -11,6 +11,7 @@
             font-family: sans-serif; margin: 0; padding: 0; overflow: hidden; 
         }
         .header { padding: 10px; background: #f8f9fa; border-bottom: 2px solid #28a745; }
+        .score-label { font-size: 0.9em; color: #666; }
         .score-value { font-size: 2em; font-weight: bold; color: #28a745; }
         
         canvas { 
@@ -37,11 +38,25 @@
             padding: 20px; border: 2px solid #28a745; border-radius: 15px; z-index: 10;
             box-shadow: 0 0 20px rgba(0,0,0,0.2);
         }
+
+        /* Pantalla de bloqueo para navegadores externos */
+        #lock-screen {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: white; z-index: 999; color: #dc3545; flex-direction: column;
+            align-items: center; justify-content: center; padding: 20px;
+        }
     </style>
 </head>
 <body>
 
+    <div id="lock-screen">
+        <h1 style="font-size: 3em;">⚠️</h1>
+        <h2>ACCESO DENEGADO</h2>
+        <p>Este juego solo funciona dentro del Bot oficial de Telegram.</p>
+    </div>
+
     <div class="header">
+        <div class="score-label">PUNTOS</div>
         <div class="score-value" id="score">0</div>
     </div>
 
@@ -56,15 +71,23 @@
 
     <div id="retry-screen">
         <h2 style="color:#dc3545; margin-top:0;">¡GAME OVER!</h2>
+        <p>Sincronizando puntos...</p>
         <button class="btn" onclick="resetGame()">REINTENTAR</button>
     </div>
 
     <script>
-        const tg = window.Telegram.WebApp; tg.expand();
+        // --- VERIFICACIÓN DE TELEGRAM ---
+        const tg = window.Telegram.WebApp;
+        
+        if (!tg.initDataUnsafe || !tg.initDataUnsafe.user) {
+            document.getElementById("lock-screen").style.display = "flex";
+            throw new Error("Acceso no autorizado.");
+        }
+
+        tg.expand();
         const cvs = document.getElementById("gc"), ctx = cvs.getContext("2d");
         let box = 20, snake, food, d, score, raw, game;
 
-        // Función centralizada para cambiar dirección sin "suicidarse"
         function setDir(newDir) {
             if(newDir == "LEFT" && d != "RIGHT") d = "LEFT";
             if(newDir == "UP" && d != "DOWN") d = "UP";
@@ -72,7 +95,6 @@
             if(newDir == "DOWN" && d != "UP") d = "DOWN";
         }
 
-        // --- SOPORTE PARA TECLADO (WASD Y FLECHAS) ---
         document.addEventListener("keydown", (e) => {
             const key = e.key.toLowerCase();
             if (key === "arrowup" || key === "w") setDir("UP");
@@ -94,11 +116,13 @@
         function draw() {
             ctx.fillStyle = "white"; ctx.fillRect(0,0,300,300);
             
+            // Serpiente Verde
             for(let i=0; i<snake.length; i++){
                 ctx.fillStyle = (i==0) ? "#28a745" : "#5cb85c";
                 ctx.fillRect(snake[i].x, snake[i].y, box-1, box-1);
             }
 
+            // Moneda Amarilla
             ctx.fillStyle = "#ffc107";
             ctx.beginPath(); ctx.arc(food.x+10, food.y+10, 8, 0, Math.PI*2); ctx.fill();
 
@@ -115,8 +139,13 @@
             if(sx<0 || sy<0 || sx>=300 || sy>=300 || snake.some(s=>s.x==head.x && s.y==head.y)){
                 clearInterval(game);
                 document.getElementById("retry-screen").style.display = "block";
-                // Envío de puntos a Python
-                tg.sendData(JSON.stringify({"puntos": score, "hash": btoa("VIRUS_"+score)}));
+                
+                // Envía puntos y cierra la WebApp para que el Bot los procese
+                if(score > 0) {
+                    setTimeout(() => {
+                        tg.sendData(JSON.stringify({"puntos": score}));
+                    }, 1000); 
+                }
                 return;
             }
             snake.unshift(head);
