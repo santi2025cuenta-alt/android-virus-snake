@@ -6,18 +6,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { background: #ffffff; color: #333; text-align: center; font-family: sans-serif; margin: 0; padding: 0; overflow: hidden; }
-        .header { padding: 10px; background: #f8f9fa; border-bottom: 2px solid #28a745; }
-        .score-value { font-size: 2em; font-weight: bold; color: #28a745; }
-        canvas { border: 3px solid #28a745; background: #fff; display: block; margin: 10px auto; width: 80vw; height: 80vw; max-width: 300px; max-height: 300px; }
+        /* Estilo Dark Hacker */
+        body { background: #000; color: #0f0; text-align: center; font-family: 'Courier New', Courier, monospace; margin: 0; padding: 0; overflow: hidden; }
+        .header { padding: 10px; background: #111; border-bottom: 2px solid #0f0; box-shadow: 0 0 10px #0f0; }
+        .score-value { font-size: 2.5em; font-weight: bold; color: #0f0; text-shadow: 0 0 5px #0f0; }
+        canvas { border: 2px solid #0f0; background: #050505; display: block; margin: 15px auto; width: 85vw; height: 85vw; max-width: 320px; max-height: 320px; box-shadow: 0 0 15px rgba(0, 255, 0, 0.2); }
         .controls { display: grid; grid-template-columns: repeat(3, 1fr); width: 180px; margin: 10px auto; gap: 10px; }
-        .btn { background: #28a745; color: white; border: none; padding: 15px; font-size: 1.5em; border-radius: 10px; touch-action: manipulation; }
-        #retry-screen { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border: 2px solid #28a745; border-radius: 15px; z-index: 10; width: 200px; box-shadow: 0 0 20px rgba(0,0,0,0.2); }
+        .btn { background: #111; color: #0f0; border: 1px solid #0f0; padding: 15px; font-size: 1.5em; border-radius: 12px; touch-action: manipulation; transition: 0.1s; }
+        .btn:active { background: #0f0; color: #000; }
+        #retry-screen { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #000; padding: 25px; border: 2px solid #f00; border-radius: 15px; z-index: 10; width: 220px; box-shadow: 0 0 25px #f00; }
+        h2 { text-shadow: 0 0 10px #f00; }
     </style>
 </head>
 <body>
     <div class="header">
-        <div style="font-size: 0.9em; color: #666;">PUNTOS</div>
+        <div style="font-size: 0.8em; color: #0f0;">SISTEMA DE EXTRACCIÓN ADC</div>
         <div class="score-value" id="score">0</div>
     </div>
     <canvas id="gc" width="300" height="300"></canvas>
@@ -30,10 +33,10 @@
     </div>
 
     <div id="retry-screen">
-        <h2 style="color:#dc3545; margin:0;">¡GAME OVER!</h2>
-        <p id="status-text"></p>
-        <button class="btn" style="width:100%; margin-bottom:10px;" onclick="enviarYReiniciar()">REINTENTAR</button>
-        <button class="btn" style="width:100%; background:#dc3545;" onclick="tg.close()">SALIR</button>
+        <h2 style="color:#f00; margin:0;">CONEXIÓN PERDIDA</h2>
+        <p id="status-text" style="color: #0f0;"></p>
+        <button class="btn" style="width:100%; margin-bottom:10px; border-color: #0f0;" onclick="enviarYReiniciar()">REINTENTAR</button>
+        <button class="btn" style="width:100%; background:#f00; color: #000; border: none;" onclick="tg.close()">ABORTAR</button>
     </div>
 
     <script>
@@ -44,20 +47,13 @@
         const cvs = document.getElementById("gc"), ctx = cvs.getContext("2d");
         let box = 20, snake, food, d, score, monedas, game;
 
-        // --- CONTROL POR TECLADO (NUEVO) ---
         document.addEventListener("keydown", function(e) {
             const key = e.key.toUpperCase();
-            
-            // WASD o Flechas
             if ((key === "W" || key === "ARROWUP") && d !== "DOWN") d = "UP";
             if ((key === "S" || key === "ARROWDOWN") && d !== "UP") d = "DOWN";
             if ((key === "A" || key === "ARROWLEFT") && d !== "RIGHT") d = "LEFT";
             if ((key === "D" || key === "ARROWRIGHT") && d !== "LEFT") d = "RIGHT";
-
-            // Evitar que las flechas muevan la pantalla del navegador
-            if(["ARROWUP","ARROWDOWN","ARROWLEFT","ARROWRIGHT"].includes(key)) {
-                e.preventDefault();
-            }
+            if(["ARROWUP","ARROWDOWN","ARROWLEFT","ARROWRIGHT"].includes(key)) e.preventDefault();
         });
 
         function setDir(n) { 
@@ -66,13 +62,7 @@
         }
 
         function enviarYReiniciar() {
-            if (score > 0) {
-                try {
-                    tg.sendData(JSON.stringify({"puntos": score}));
-                } catch (e) {
-                    console.log("Error al enviar datos");
-                }
-            }
+            // Mismo envío automático al morir, pero aquí reforzamos antes de resetear
             resetGame();
         }
 
@@ -87,12 +77,19 @@
         }
 
         function draw() {
-            ctx.fillStyle = "white"; ctx.fillRect(0,0,300,300);
+            ctx.fillStyle = "#050505"; ctx.fillRect(0,0,300,300);
+            
+            // Dibujar rejilla estilo hacker (opcional pero queda cool)
+            ctx.strokeStyle = "#010"; ctx.lineWidth = 1;
+            for(let i=0; i<300; i+=box) { ctx.strokeRect(i, 0, box, 300); ctx.strokeRect(0, i, 300, box); }
+
             for(let i=0;i<snake.length;i++){
-                ctx.fillStyle=(i==0)?"#28a745":"#5cb85c";
+                ctx.fillStyle=(i==0)?"#0f0":"#050";
                 ctx.fillRect(snake[i].x,snake[i].y,box-1,box-1);
+                if(i==0) { ctx.shadowBlur = 10; ctx.shadowColor = "#0f0"; } else { ctx.shadowBlur = 0; }
             }
-            ctx.fillStyle="#ffc107";
+            
+            ctx.fillStyle="#f0f"; // Comida color Neón
             ctx.beginPath(); ctx.arc(food.x+10,food.y+10,8,0,Math.PI*2); ctx.fill();
 
             let sx=snake[0].x, sy=snake[0].y;
@@ -108,9 +105,17 @@
             let head={x:sx,y:sy};
             if(sx<0||sy<0||sx>=300||sy>=300||snake.some(s=>s.x==head.x&&s.y==head.y)){
                 clearInterval(game);
-                document.getElementById("status-text").innerText="Total: "+score+" ADC";
+                document.getElementById("status-text").innerText="ADC EXTRAÍDAS: "+score;
                 document.getElementById("retry-screen").style.display="block";
-                if(score>0) try { tg.sendData(JSON.stringify({"puntos": score})); } catch(e){}
+                
+                // Envío de datos a Telegram
+                if(score > 0) {
+                    try {
+                        tg.sendData(JSON.stringify({"puntos": score}));
+                    } catch(e) {
+                        console.error("Error de inyección");
+                    }
+                }
                 return;
             }
             snake.unshift(head);
