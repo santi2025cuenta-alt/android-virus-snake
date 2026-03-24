@@ -81,9 +81,12 @@
         tg.ready();
         tg.expand();
 
-        // Verificar si estamos realmente en Telegram
-        if (!tg.initDataUnsafe || Object.keys(tg.initDataUnsafe).length === 0) {
-            document.getElementById("lock-screen").style.display = "flex";
+        // BUG FIX: Verificación de entorno real
+        if (!tg.initDataUnsafe || !tg.initDataUnsafe.user) {
+            // Solo bloqueamos si no hay datos de usuario
+            if (window.location.hostname !== "localhost") {
+                document.getElementById("lock-screen").style.display = "flex";
+            }
         }
 
         const cvs = document.getElementById("gc"), ctx = cvs.getContext("2d");
@@ -104,14 +107,21 @@
             if (key === "arrowright" || key === "d") setDir("RIGHT");
         });
 
-        // NUEVA FUNCIÓN: Envía datos y luego reinicia o cierra
+        // BUG FIX: Función robusta de envío
         function enviarYReiniciar() {
             if (score > 0) {
-                tg.sendData(JSON.stringify({"puntos": score}));
-                // IMPORTANTE: tg.sendData CIERRA la WebApp automáticamente 
-                // si se configuró correctamente en un botón de teclado.
+                const data = JSON.stringify({"puntos": score});
+                try {
+                    tg.sendData(data);
+                    // Si estamos en un modo que permite sendData, se cerrará solo.
+                    // Si no, forzamos un reset después de intentar enviar.
+                    setTimeout(resetGame, 500);
+                } catch (e) {
+                    resetGame();
+                }
+            } else {
+                resetGame();
             }
-            resetGame();
         }
 
         function resetGame() {
@@ -140,22 +150,27 @@
             if(d=="LEFT") sx-=box; if(d=="UP") sy-=box; if(d=="RIGHT") sx+=box; if(d=="DOWN") sy+=box;
 
             if(sx==food.x && sy==food.y){
-                raw++; score = (raw==1) ? 10 : score + 1;
+                raw++; 
+                // BUG FIX: Asegurar que el score sume correctamente siempre
+                score = score + 10; 
                 document.getElementById("score").innerText = score;
-                food = {x: Math.floor(Math.random()*14+1)*box, y: Math.floor(Math.random()*14+1)*box};
+                food = {x: Math.floor(Math.random()*13+1)*box, y: Math.floor(Math.random()*13+1)*box};
             } else { snake.pop(); }
 
             let head = {x:sx, y:sy};
+            
+            // BUG FIX: Colisión con bordes corregida (>=300)
             if(sx<0 || sy<0 || sx>=300 || sy>=300 || snake.some(s=>s.x==head.x && s.y==head.y)){
                 clearInterval(game);
                 document.getElementById("retry-screen").style.display = "block";
                 
-                // Intentamos enviar los datos al morir inmediatamente
                 if(score > 0) {
+                    document.getElementById("status-text").innerText = "Puntos: " + score;
+                    // Intentar enviar datos al morir
                     try {
                         tg.sendData(JSON.stringify({"puntos": score}));
                     } catch (e) {
-                        console.error("Error al enviar datos:", e);
+                        console.log("WebApp en modo link (Grupo): No permite sendData directo.");
                     }
                 }
                 return;
