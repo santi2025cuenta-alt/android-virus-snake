@@ -72,7 +72,7 @@
 
     <div id="retry-screen">
         <h2 style="color:#dc3545; margin-top:0;">¡GAME OVER!</h2>
-        <p id="status-text">Sincronizando puntos...</p>
+        <p id="status-text">Calculando ADC...</p>
         <button class="btn" onclick="enviarYReiniciar()">REINTENTAR</button>
         <button class="btn btn-exit" onclick="tg.close()">SALIR Y GUARDAR</button>
     </div>
@@ -89,7 +89,7 @@
         }
 
         const cvs = document.getElementById("gc"), ctx = cvs.getContext("2d");
-        let box = 20, snake, food, d, score, monedas, game; // 'monedas' cuenta cuántas llevas
+        let box = 20, snake, food, d, score, monedas, game;
 
         function setDir(newDir) {
             if(newDir == "LEFT" && d != "RIGHT") d = "LEFT";
@@ -108,26 +108,20 @@
 
         function enviarYReiniciar() {
             if (score > 0) {
-                const data = JSON.stringify({"puntos": score});
                 try {
-                    tg.sendData(data);
-                    setTimeout(resetGame, 500);
-                } catch (e) {
-                    resetGame();
-                }
-            } else {
-                resetGame();
+                    tg.sendData(JSON.stringify({"puntos": score}));
+                } catch (e) { console.log("Error de envío"); }
             }
+            resetGame();
         }
 
         function resetGame() {
             document.getElementById("retry-screen").style.display = "none";
-            document.getElementById("status-text").innerText = "Sincronizando puntos...";
             snake = [{x: 7*box, y: 10*box}, {x: 6*box, y: 10*box}, {x: 5*box, y: 10*box}];
-            food = {x: Math.floor(Math.random()*14+1)*box, y: Math.floor(Math.random()*14+1)*box};
+            food = {x: Math.floor(Math.random()*13+1)*box, y: Math.floor(Math.random()*13+1)*box};
             d = "RIGHT"; 
             score = 0; 
-            monedas = 0; // Reset de contador de monedas
+            monedas = 0; 
             document.getElementById("score").innerText = "0";
             if(game) clearInterval(game);
             game = setInterval(draw, 140);
@@ -148,13 +142,13 @@
             if(d=="LEFT") sx-=box; if(d=="UP") sy-=box; if(d=="RIGHT") sx+=box; if(d=="DOWN") sy+=box;
 
             if(sx==food.x && sy==food.y){
-                monedas++; // Sumamos una moneda recolectada
+                monedas++; 
                 
-                // Lógica corregida:
+                // LÓGICA DE PUNTOS REPARADA:
                 if(monedas === 1) {
-                    score = 10; // La primera vale 10
+                    score = 10; // Primera moneda pone el contador en 10
                 } else {
-                    score = score + 1; // Las demás valen 1
+                    score = score + 1; // Las siguientes suman de a 1
                 }
 
                 document.getElementById("score").innerText = score;
@@ -165,16 +159,8 @@
             
             if(sx<0 || sy<0 || sx>=300 || sy>=300 || snake.some(s=>s.x==head.x && s.y==head.y)){
                 clearInterval(game);
+                document.getElementById("status-text").innerText = "Total ADC: " + score;
                 document.getElementById("retry-screen").style.display = "block";
-                
-                if(score > 0) {
-                    document.getElementById("status-text").innerText = "ADC Extraídas: " + score;
-                    try {
-                        tg.sendData(JSON.stringify({"puntos": score}));
-                    } catch (e) {
-                        console.log("Modo Grupo habilitado.");
-                    }
-                }
                 return;
             }
             snake.unshift(head);
