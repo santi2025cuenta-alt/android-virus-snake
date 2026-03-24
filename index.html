@@ -31,15 +31,16 @@
             touch-action: manipulation; cursor: pointer;
         }
         .btn:active { background: #1e7e34; }
+        .btn-exit { background: #dc3545; margin-top: 10px; padding: 10px; font-size: 1.2em; }
 
         #retry-screen {
             display: none; position: absolute; top: 50%; left: 50%;
             transform: translate(-50%, -50%); background: white;
             padding: 20px; border: 2px solid #28a745; border-radius: 15px; z-index: 10;
             box-shadow: 0 0 20px rgba(0,0,0,0.2);
+            width: 200px;
         }
 
-        /* Pantalla de bloqueo para navegadores externos */
         #lock-screen {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: white; z-index: 999; color: #dc3545; flex-direction: column;
@@ -73,17 +74,15 @@
         <h2 style="color:#dc3545; margin-top:0;">¡GAME OVER!</h2>
         <p id="status-text">Sincronizando puntos...</p>
         <button class="btn" onclick="enviarYReiniciar()">REINTENTAR</button>
+        <button class="btn btn-exit" onclick="tg.close()">SALIR Y GUARDAR</button>
     </div>
 
     <script>
-        // --- VERIFICACIÓN DE TELEGRAM ---
         const tg = window.Telegram.WebApp;
         tg.ready();
         tg.expand();
 
-        // BUG FIX: Verificación de entorno real
         if (!tg.initDataUnsafe || !tg.initDataUnsafe.user) {
-            // Solo bloqueamos si no hay datos de usuario
             if (window.location.hostname !== "localhost") {
                 document.getElementById("lock-screen").style.display = "flex";
             }
@@ -107,14 +106,13 @@
             if (key === "arrowright" || key === "d") setDir("RIGHT");
         });
 
-        // BUG FIX: Función robusta de envío
         function enviarYReiniciar() {
             if (score > 0) {
                 const data = JSON.stringify({"puntos": score});
                 try {
                     tg.sendData(data);
-                    // Si estamos en un modo que permite sendData, se cerrará solo.
-                    // Si no, forzamos un reset después de intentar enviar.
+                    // Si sendData funciona (Privado), la app se cierra sola.
+                    // Si no, reiniciamos el juego tras un delay.
                     setTimeout(resetGame, 500);
                 } catch (e) {
                     resetGame();
@@ -150,8 +148,6 @@
             if(d=="LEFT") sx-=box; if(d=="UP") sy-=box; if(d=="RIGHT") sx+=box; if(d=="DOWN") sy+=box;
 
             if(sx==food.x && sy==food.y){
-                raw++; 
-                // BUG FIX: Asegurar que el score sume correctamente siempre
                 score = score + 10; 
                 document.getElementById("score").innerText = score;
                 food = {x: Math.floor(Math.random()*13+1)*box, y: Math.floor(Math.random()*13+1)*box};
@@ -159,18 +155,16 @@
 
             let head = {x:sx, y:sy};
             
-            // BUG FIX: Colisión con bordes corregida (>=300)
             if(sx<0 || sy<0 || sx>=300 || sy>=300 || snake.some(s=>s.x==head.x && s.y==head.y)){
                 clearInterval(game);
                 document.getElementById("retry-screen").style.display = "block";
                 
                 if(score > 0) {
-                    document.getElementById("status-text").innerText = "Puntos: " + score;
-                    // Intentar enviar datos al morir
+                    document.getElementById("status-text").innerText = "Acumulado: " + score;
                     try {
                         tg.sendData(JSON.stringify({"puntos": score}));
                     } catch (e) {
-                        console.log("WebApp en modo link (Grupo): No permite sendData directo.");
+                        console.log("Modo Grupo: Usa el botón 'Salir' para guardar.");
                     }
                 }
                 return;
