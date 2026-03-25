@@ -6,14 +6,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        /* Regreso al Estilo Original Claro */
         body { background: #ffffff; color: #333; text-align: center; font-family: sans-serif; margin: 0; padding: 0; overflow: hidden; }
         .header { padding: 10px; background: #f8f9fa; border-bottom: 2px solid #28a745; }
         .score-value { font-size: 2em; font-weight: bold; color: #28a745; }
         canvas { border: 3px solid #28a745; background: #fff; display: block; margin: 10px auto; width: 80vw; height: 80vw; max-width: 300px; max-height: 300px; }
         .controls { display: grid; grid-template-columns: repeat(3, 1fr); width: 180px; margin: 10px auto; gap: 10px; }
         .btn { background: #28a745; color: white; border: none; padding: 15px; font-size: 1.5em; border-radius: 10px; touch-action: manipulation; }
-        #retry-screen { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border: 2px solid #28a745; border-radius: 15px; z-index: 10; width: 200px; box-shadow: 0 0 20px rgba(0,0,0,0.2); }
+        #retry-screen { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border: 2px solid #28a745; border-radius: 15px; z-index: 10; width: 220px; box-shadow: 0 0 20px rgba(0,0,0,0.2); }
+        .btn-retry { background: #28a745; width: 100%; margin-bottom: 10px; }
+        .btn-exit { background: #dc3545; width: 100%; }
+        #loading-text { font-size: 0.8em; color: #666; display: none; margin-bottom: 5px; }
     </style>
 </head>
 <body>
@@ -31,10 +33,11 @@
     </div>
 
     <div id="retry-screen">
-        <h2 style="color:#dc3545; margin:0;">¡GAME OVER!</h2>
-        <p id="status-text"></p>
-        <button class="btn" style="width:100%; margin-bottom:10px;" onclick="enviarYReiniciar()">REINTENTAR</button>
-        <button class="btn" style="width:100%; background:#dc3545;" onclick="tg.close()">SALIR</button>
+        <h2 style="color:#dc3545; margin:0 0 10px 0;">¡GAME OVER!</h2>
+        <p id="status-text" style="font-weight:bold;"></p>
+        <div id="loading-text">Enviando ADC...</div>
+        <button class="btn btn-retry" id="btn-env" onclick="enviarYReiniciar()">REINTENTAR / ENVIAR</button>
+        <button class="btn btn-exit" onclick="tg.close()">SALIR</button>
     </div>
 
     <script>
@@ -44,42 +47,39 @@
 
         const cvs = document.getElementById("gc"), ctx = cvs.getContext("2d");
         let box = 20, snake, food, d, score, monedas, game;
+        let enviando = false;
 
-        // --- CONTROL POR TECLADO ---
-        document.addEventListener("keydown", function(e) {
-            const key = e.key.toUpperCase();
-            if ((key === "W" || key === "ARROWUP") && d !== "DOWN") d = "UP";
-            if ((key === "S" || key === "ARROWDOWN") && d !== "UP") d = "DOWN";
-            if ((key === "A" || key === "ARROWLEFT") && d !== "RIGHT") d = "LEFT";
-            if ((key === "D" || key === "ARROWRIGHT") && d !== "LEFT") d = "RIGHT";
-
-            if(["ARROWUP","ARROWDOWN","ARROWLEFT","ARROWRIGHT"].includes(key)) {
-                e.preventDefault();
-            }
-        });
-
+        // --- DIRECCIONES ---
         function setDir(n) { 
             if(n=='LEFT'&&d!='RIGHT')d='LEFT'; if(n=='UP'&&d!='DOWN')d='UP';
             if(n=='RIGHT'&&d!='LEFT')d='RIGHT'; if(n=='DOWN'&&d!='UP')d='DOWN';
         }
 
-        // --- FUNCIÓN MODIFICADA PARA INYECCIÓN ---
+        // --- ENVIAR PUNTOS Y REINICIAR ---
         async function enviarYReiniciar() {
+            if (enviando) return;
+            
             if (score > 0) {
-                // Obtener ID real de Telegram o usar uno de prueba
+                enviando = true;
+                document.getElementById("loading-text").style.display = "block";
+                document.getElementById("btn-env").innerText = "PROCESANDO...";
+
                 const userId = (tg.initDataUnsafe && tg.initDataUnsafe.user) ? tg.initDataUnsafe.user.id : "TEST_USER";
-                
-                // TU URL DE SERVEO (Copiada de tu captura)
+                // URL DE TU TÚNEL (Verifica que sea la misma de Termux)
                 const TUNEL_URL = "https://faf65aa98b6ea21-190-246-115-76.serveusercontent.com"; 
 
                 try {
-                    // Enviar puntos al servidor Flask en Termux
+                    // Llamada al servidor Flask en Termux
                     await fetch(`${TUNEL_URL}/inyectar?id=${userId}&puntos=${score}`, { mode: 'no-cors' });
-                    console.log("Inyección completada");
+                    console.log("Datos enviados al túnel correctamente.");
                 } catch (e) {
-                    console.error("Error de red");
+                    console.error("Error al conectar con el túnel.");
                 }
             }
+            
+            enviando = false;
+            document.getElementById("loading-text").style.display = "none";
+            document.getElementById("btn-env").innerText = "REINTENTAR / ENVIAR";
             resetGame();
         }
 
@@ -115,20 +115,18 @@
             } else { snake.pop(); }
 
             let head={x:sx,y:sy};
+
+            // CHOQUE
             if(sx<0||sy<0||sx>=300||sy>=300||snake.some(s=>s.x==head.x&&s.y==head.y)){
                 clearInterval(game);
                 document.getElementById("status-text").innerText="Total: "+score+" ADC";
                 document.getElementById("retry-screen").style.display="block";
-                
-                if(score>0) {
-                    try {
-                        tg.sendData(JSON.stringify({"puntos": score}));
-                    } catch(e){}
-                }
+                // IMPORTANTE: Eliminamos tg.sendData() de aquí para que no se cierre solo.
                 return;
             }
             snake.unshift(head);
         }
+
         resetGame();
     </script>
 </body>
